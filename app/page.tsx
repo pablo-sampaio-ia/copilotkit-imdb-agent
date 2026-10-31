@@ -1,117 +1,63 @@
 "use client";
 
-import {
-  CopilotSidebar,
-  CopilotThreadsDrawer,
-  useAgentContext,
-} from "@copilotkit/react-core/v2";
-import { Header } from "../components/Header";
-import { Footer } from "../components/Footer";
-import { CustomAssistantMessage } from "../components/AssistantMessage";
+import { CopilotSidebar, CopilotThreadsDrawer } from "@copilotkit/react-core/v2";
+import { ChatSuggestions } from "../components/ChatSuggestions";
 import { CopilotDataTools } from "../components/CopilotDataTools";
-import { Suspense, useEffect, useState } from "react";
-import { startCurrentTimeUpdates } from "../lib/current-time.mjs";
+import { CustomAssistantMessage } from "../components/AssistantMessage";
+import { Header } from "../components/Header";
 
-const EXAMPLE_PROMPTS = [
-  "Show me a bar chart of average rating by genre",
-  "Plot total worldwide gross by year for the last decade",
-  "Which directors have the most Oscar wins in this dataset?",
-  "Analyze the whole dataset for me",
-];
-
-function CurrentTimeContext() {
-  const [currentTime, setCurrentTime] = useState(() =>
-    new Date().toLocaleTimeString(),
-  );
-
-  useEffect(
-    () =>
-      startCurrentTimeUpdates(() => {
-        setCurrentTime(new Date().toLocaleTimeString());
-      }),
-    [],
-  );
-
-  useAgentContext({
-    description: "Current time",
-    value: currentTime,
-  });
-
-  return null;
-}
-
-function HomeContent() {
-  return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <CurrentTimeContext />
-      {/* Persistent thread switcher for the IMDB assistant's conversations;
-          shares its active-thread state with the CopilotSidebar chat below
-          via the CopilotChatConfigurationProvider that <CopilotKit> renders
-          around the app in layout.tsx. */}
-      <CopilotThreadsDrawer
-        label="IMDB Movies Assistant threads"
-        recentLabel="Recent Conversations"
-      />
-      <div className="flex flex-col flex-1">
-        <CopilotDataTools />
-        <Header />
-        <main className="w-full max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8 flex-grow">
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-2">
-              Try asking the assistant
-            </h2>
-            <p className="text-sm text-gray-500 mb-4">
-              Charts, stats, and ad-hoc analysis render right here in the chat
-              on the right. A few things to try:
-            </p>
-            <ul className="space-y-2">
-              {EXAMPLE_PROMPTS.map((prompt) => (
-                <li
-                  key={prompt}
-                  className="text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded-md px-3 py-2"
-                >
-                  {prompt}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </main>
-        <Footer />
-        <CopilotSidebar
-          defaultOpen
-          width={480}
-          messageView={{ assistantMessage: CustomAssistantMessage }}
-          labels={{
-            modalHeaderTitle: "IMDB Movies Assistant",
-            welcomeMessageText:
-              "Hello, I'm here to help you explore the IMDB top-movies-per-year dataset. Try asking for a chart by genre, year, rating, or box office.",
-            chatInputPlaceholder:
-              "Ask about movies, ratings, genres, or box office...",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
+/**
+ * Layout em três áreas lado a lado:
+ *   [threads] [painel central] [chat]
+ * O chat (CopilotSidebar) é `position: fixed` e empurra o <body> com uma
+ * margem à direita quando está aberto, por isso aqui só descrevemos as duas
+ * primeiras áreas.
+ */
 export default function Home() {
   return (
-    <Suspense
-      fallback={
-        <div
-          className="min-h-screen bg-gray-50 flex items-center justify-center"
-          role="status"
-          aria-live="polite"
-        >
-          <div
-            className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"
-            aria-hidden="true"
-          />
-          <span className="sr-only">Loading...</span>
-        </div>
-      }
-    >
-      <HomeContent />
-    </Suspense>
+    <div className="flex h-screen bg-gray-50">
+      {/* Registra as ferramentas do agente (não renderiza nada visível). */}
+      <CopilotDataTools />
+      <ChatSuggestions />
+
+      <aside className="threads-column h-full shrink-0 border-r border-gray-200 bg-white">
+        <CopilotThreadsDrawer
+          label="IMDB Movies Assistant threads"
+          recentLabel="Recent Conversations"
+        />
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <Header />
+        <main className="mx-auto w-full max-w-3xl flex-grow px-4 py-10 sm:px-6">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-2 text-lg font-medium text-gray-900">
+              How it works
+            </h2>
+            <p className="text-sm text-gray-500">
+              Chat with the assistant in the panel on the right. Charts, stats
+              and ad-hoc analyses are rendered inside the chat itself. Use the
+              suggestions in the chat to get started, or the conversation
+              history on the left to resume an earlier analysis.
+            </p>
+          </div>
+        </main>
+      </div>
+
+      <CopilotSidebar
+        defaultOpen
+        // Largura fixa: sem ela o CopilotSidebar mede o próprio elemento e
+        // pode colapsar para menos de 1px.
+        width={480}
+        messageView={{ assistantMessage: CustomAssistantMessage }}
+        labels={{
+          modalHeaderTitle: "IMDB Movies Assistant",
+          welcomeMessageText:
+            "Hello, I'm here to help you explore the IMDB top-movies-per-year dataset. Try asking for a chart by genre, year, rating, or box office.",
+          chatInputPlaceholder:
+            "Ask about movies, ratings, genres, or box office...",
+        }}
+      />
+    </div>
   );
 }

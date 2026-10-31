@@ -154,18 +154,9 @@
   }
 }
 
-/* Custom CopilotKit styling to match dashboard */
-.copilotKitSidebar .copilotKitWindow {
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-}
-
-.copilotKitButton {
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.copilotKitMessage.copilotKitUserMessage {
-  margin-bottom: 30px;
-  margin-top: 15px;
+/* A lista de threads é um web component; sem isto ele ocupa só a altura do
+   conteúdo em vez da coluna inteira. */
+.threads-column copilotkit-threads-drawer {
+  display: block;
+  height: 100%;
 }
