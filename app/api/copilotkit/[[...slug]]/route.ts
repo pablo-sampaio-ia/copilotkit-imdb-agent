@@ -4,35 +4,44 @@ import {
   CopilotRuntime,
   createCopilotRuntimeHandler,
 } from "@copilotkit/runtime/v2";
+import { agentUrl, intelligenceApiKey } from "../../../../lib/runtime-config";
 
-// The IMDB movies-analysis agent: a Python LangGraph agent served over AG-UI
-// by a standalone FastAPI process (agent/main.py, port 8123).
-const imdbAgent = new HttpAgent({
-  url: process.env.IMDB_AGENT_URL || "http://localhost:8123",
-});
+// O agente de análise: um agente LangGraph em Python, servido por AG-UI em um
+// processo FastAPI separado (agent/main.py). O runtime só repassa as
+// mensagens e os eventos entre o navegador e ele.
+const agents = { imdb_agent: new HttpAgent({ url: agentUrl }) };
 
-const runtime = new CopilotRuntime({
-  agents: {
-    imdb_agent: imdbAgent,
-  },
-  // Connects the runtime to CopilotKit Intelligence (AG-UI Streams / Rich
-  // Threads, the Inspector, and Automatic Learning). The Python agent above
-  // requires Intelligence: it has no SSE/in-memory runner fallback.
-  intelligence: new CopilotKitIntelligence({
-    apiKey: process.env.CPK_INTELLIGENCE_API_KEY!,
-    // Assigns this agent's threads to the pre-created Learning container so
-    // Automatic Learning can analyze them.
-    getLearningContainerId: () => "imdb-movies-agent",
-  }),
-  // Local-dev placeholder identity: every visitor currently shares the
-  // "local-user" thread history. Replace with a real verified session/token
-  // lookup (see the Intelligence quickstart) before deploying with more than
-  // one user.
-  identifyUser: (request) => ({
-    id: request.headers.get("x-user-id") ?? "local-user",
-    name: request.headers.get("x-user-name") ?? "Local user",
-  }),
-});
+// Dois modos de execução, decididos pela presença de CPK_INTELLIGENCE_API_KEY:
+//
+// 1. Com Intelligence: threads persistentes (AG-UI Streams), Inspector e
+//    Automatic Learning, hospedados pelo CopilotKit na nuvem.
+// 2. Sem Intelligence: modo SSE local, estado só em memória. Serve para
+//    estudar o projeto sem conta; as conversas não persistem.
+const runtime = intelligenceApiKey
+  ? new CopilotRuntime({
+      agents,
+      intelligence: new CopilotKitIntelligence({
+        apiKey: intelligenceApiKey,
+        // Associa as threads deste agente ao container de Learning já criado.
+        getLearningContainerId: () => "imdb-movies-agent",
+      }),
+      // Identidade provisória para desenvolvimento local: todos os visitantes
+      // compartilham o histórico de "local-user". Troque por uma sessão
+      // verificada antes de ter mais de um usuário.
+      identifyUser: (request) => ({
+        id: request.headers.get("x-user-id") ?? "local-user",
+        name: request.headers.get("x-user-name") ?? "Local user",
+      }),
+    })
+  : new CopilotRuntime({ agents });
+
+console.log(
+  `[imdb] CopilotKit runtime: ${
+    intelligenceApiKey
+      ? "Intelligence mode (persistent threads)"
+      : "local SSE mode (no CPK_INTELLIGENCE_API_KEY; threads are not persisted)"
+  }; agent at ${agentUrl}`,
+);
 
 const handler = createCopilotRuntimeHandler({
   runtime,

@@ -143,12 +143,27 @@ def histogram_chart(
     bins: int,
     filters: Optional[dict],
     title: Optional[str],
+    trim_outliers: bool = True,
 ) -> dict:
-    """Distribuição de um campo numérico em faixas de mesma largura (devolvida como barras)."""
+    """Distribuição de um campo numérico em faixas de mesma largura (devolvida como barras).
+
+    Com `trim_outliers`, valores fora do intervalo entre os percentis 1 e 99 ficam de fora:
+    sem isso, um único valor absurdo (ex.: uma minissérie de 4000 minutos) estica o
+    eixo e faz quase todos os filmes caírem na primeira faixa."""
     col = resolve_numeric_column(field, df)
     values = apply_filters(df, filters)[col].dropna()
     if values.empty:
         raise ValueError(f"No rows with a value for {col} match the given filters.")
+
+    notes = []
+    if trim_outliers:
+        low, high = values.quantile(0.01), values.quantile(0.99)
+        kept = values[(values >= low) & (values <= high)]
+        if len(kept) < len(values):
+            notes.append(
+                f"{len(values) - len(kept)} extreme values outside {_short_number(low)}–{_short_number(high)} left out."
+            )
+        values = kept
 
     counts, edges = np.histogram(values, bins=max(2, min(bins, 40)))
     categories = [f"{_short_number(edges[i])}–{_short_number(edges[i + 1])}" for i in range(len(counts))]
@@ -158,7 +173,7 @@ def histogram_chart(
         "categories": categories,
         "series": [{"name": "movies", "data": [int(c) for c in counts]}],
         "value_format": "number",
-        "notes": [f"{len(values)} movies with a {col} value."],
+        "notes": [f"{len(values)} movies shown."] + notes,
     }
 
 

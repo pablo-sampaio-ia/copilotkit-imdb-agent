@@ -97,20 +97,22 @@ def plot_distribution(
     bins: int = 10,
     filters: Optional[dict] = None,
     title: Optional[str] = None,
+    trim_outliers: bool = True,
 ) -> dict:
     """Histogram of a numeric field: how many movies fall in each equal-width
     range. Returns chart data the UI renders as bars.
 
     Args:
         field: numeric column or alias, e.g. "rating_imdb", "runtime", "year", "vote".
-        bins: number of ranges (2-40). Very skewed fields (vote, money) look
-            better after filtering out extreme values.
+        bins: number of ranges (2-40).
         filters: optional row filter. Filters are {column: value | [values] | {op: value}}
         with ops eq/ne/in/gt/gte/lt/lte/contains, e.g.
         {"year": {"gte": 2010}, "genre": "Comedy", "title": {"contains": "star"}}.
         title: optional chart title.
+        trim_outliers: leave out values beyond the 1st-99th percentile (default),
+            so extreme values do not squash the chart. Set false to see them.
     """
-    return charts.histogram_chart(load_dataframe(), field, bins, filters, title)
+    return charts.histogram_chart(load_dataframe(), field, bins, filters, title, trim_outliers)
 
 
 @tool

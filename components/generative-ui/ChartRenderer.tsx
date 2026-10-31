@@ -3,154 +3,144 @@ import { AlertCircle, BarChart3, Loader } from "lucide-react";
 import { AreaChart } from "../ui/area-chart";
 import { BarChart } from "../ui/bar-chart";
 import { DonutChart } from "../ui/pie-chart";
-
-type ChartSeries = { name: string; data: number[] };
-
-type ValueFormat = "currency_usd" | "rating" | "number";
-
-type ChartPayload = {
-  type: "bar" | "line" | "pie";
-  title: string;
-  categories: string[];
-  series: ChartSeries[];
-  value_format?: ValueFormat;
-};
-
-type ChartErrorPayload = { error: string };
+import { ScatterPlot } from "./ScatterPlot";
+import {
+  CHART_COLORS,
+  VALUE_FORMATTERS,
+  parseChartResult,
+  type CategoryChart,
+} from "./chart-types";
 
 type ChartRendererProps = {
   status: "executing" | "inProgress" | "complete";
   result: string | undefined;
 };
 
-const CHART_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#6366f1",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#059669",
-  "#f97316",
-];
-
-function parseChartResult(
-  result: string | undefined,
-): ChartPayload | ChartErrorPayload | null {
-  if (!result) return null;
-  try {
-    const parsed = JSON.parse(result);
-    if (!parsed || typeof parsed !== "object") return null;
-    if (typeof parsed.error === "string") {
-      return { error: parsed.error };
-    }
-    if (Array.isArray(parsed.categories) && Array.isArray(parsed.series)) {
-      return parsed as ChartPayload;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function toRows(payload: ChartPayload): Record<string, string | number>[] {
-  return payload.categories.map((category, i) => {
+/** Uma linha por categoria, com uma coluna por série (formato do Recharts). */
+function toRows(chart: CategoryChart): Record<string, string | number>[] {
+  return chart.categories.map((category, i) => {
     const row: Record<string, string | number> = { name: category };
-    for (const series of payload.series) {
+    for (const series of chart.series) {
       row[series.name] = series.data[i] ?? 0;
     }
     return row;
   });
 }
 
-const VALUE_FORMATTERS: Record<ValueFormat, (value: number) => string> = {
-  currency_usd: (value) =>
-    value.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-      notation: Math.abs(value) >= 1_000_000 ? "compact" : "standard",
-    }),
-  rating: (value) => value.toFixed(1),
-  number: (value) => value.toLocaleString("en-US"),
-};
+/**
+ * Barras na vertical só funcionam com poucos rótulos curtos. Com muitas
+ * categorias ou rótulos longos (gêneros, títulos de filmes) usamos barras
+ * horizontais, que deixam o texto legível.
+ */
+function chooseBarLayout(chart: CategoryChart) {
+  const longest = Math.max(...chart.categories.map((c) => c.length), 0);
+  const horizontalBars = chart.categories.length > 6 || longest > 12;
+  return {
+    // No componente BarChart, "vertical" significa barras deitadas.
+    layout: horizontalBars ? ("vertical" as const) : ("horizontal" as const),
+    labelWidth: Math.min(220, Math.max(90, longest * 6.5)),
+    height: horizontalBars ? Math.max(256, chart.categories.length * 28 + 50) : 256,
+  };
+}
+
+function CategoryChartView({ chart }: { chart: CategoryChart }) {
+  const valueFormatter = VALUE_FORMATTERS[chart.value_format ?? "number"];
+  const categories = chart.series.map((s) => s.name);
+  const showLegend = chart.series.length > 1;
+  const bars = chooseBarLayout(chart);
+  const height = chart.type === "bar" ? bars.height : 256;
+
+  return (
+    <div style={{ height }}>
+      {chart.type === "bar" && (
+        <BarChart
+          data={toRows(chart)}
+          index="name"
+          categories={categories}
+          colors={CHART_COLORS}
+          valueFormatter={valueFormatter}
+          showLegend={showLegend}
+          showGrid
+          layout={bars.layout}
+          yAxisWidth={bars.layout === "vertical" ? bars.labelWidth : 55}
+        />
+      )}
+      {chart.type === "line" && (
+        <AreaChart
+          data={toRows(chart)}
+          index="name"
+          categories={categories}
+          colors={CHART_COLORS}
+          valueFormatter={valueFormatter}
+          showLegend={showLegend}
+          showGrid
+          showXAxis
+          showYAxis
+        />
+      )}
+      {chart.type === "pie" && (
+        <DonutChart
+          data={toRows(chart)}
+          category={categories[0] ?? "value"}
+          index="name"
+          colors={CHART_COLORS}
+          valueFormatter={valueFormatter}
+          showLegend
+          innerRadius={45}
+          outerRadius="90%"
+        />
+      )}
+    </div>
+  );
+}
 
 /**
- * Renders the structured JSON returned by the agent's `plot_chart` tool
- * (see agent/tools.py) as a real bar, line, or donut chart, reusing this
- * app's existing Recharts-based chart primitives. The tool's `value_format`
- * hint picks the right number formatting (a movie's rating isn't a currency).
+ * Desenha o JSON devolvido pelas ferramentas plot_* do agente
+ * (agent/imdb/charts.py) como gráfico interativo de barras, linha, pizza ou
+ * dispersão. Os avisos do agente ("notes") aparecem abaixo do gráfico.
  */
 export function ChartRenderer({ status, result }: ChartRendererProps) {
   const payload = parseChartResult(result);
-  const valueFormatter =
-    payload && "value_format" in payload
-      ? VALUE_FORMATTERS[payload.value_format ?? "number"]
-      : VALUE_FORMATTERS.number;
+  const chart = payload && "type" in payload ? payload : null;
+  const error = payload && "error" in payload ? payload.error : null;
+  const running = status === "executing" || status === "inProgress";
 
   return (
     <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
       <div className="flex items-center gap-2 mb-2">
         <BarChart3 className="h-4 w-4 text-blue-500" />
-        <h3 className="text-sm font-medium">
-          {payload && "title" in payload ? payload.title : "Chart"}
-        </h3>
+        <h3 className="text-sm font-medium">{chart?.title ?? "Chart"}</h3>
       </div>
 
-      {(status === "executing" || status === "inProgress") && (
+      {running && (
         <div className="flex items-center gap-2 text-xs text-blue-500">
           <Loader className="h-3 w-3 animate-spin" />
           <span>Building chart...</span>
         </div>
       )}
 
-      {status === "complete" && payload && "error" in payload && (
+      {status === "complete" && error && (
         <div className="flex items-center gap-2 text-sm text-red-500">
           <AlertCircle className="h-3 w-3" />
-          <span>{payload.error}</span>
+          <span>{error}</span>
         </div>
       )}
 
-      {status === "complete" && payload && "type" in payload && (
-        <div className="h-64">
-          {payload.type === "bar" && (
-            <BarChart
-              data={toRows(payload)}
-              index="name"
-              categories={payload.series.map((s) => s.name)}
-              colors={CHART_COLORS}
-              valueFormatter={valueFormatter}
-              showLegend={payload.series.length > 1}
-              showGrid
-              layout="horizontal"
-            />
-          )}
-          {payload.type === "line" && (
-            <AreaChart
-              data={toRows(payload)}
-              index="name"
-              categories={payload.series.map((s) => s.name)}
-              colors={CHART_COLORS}
-              valueFormatter={valueFormatter}
-              showLegend={payload.series.length > 1}
-              showGrid
-              showXAxis
-              showYAxis
-            />
-          )}
-          {payload.type === "pie" && (
-            <DonutChart
-              data={toRows(payload)}
-              category={payload.series[0]?.name ?? "value"}
-              index="name"
-              colors={CHART_COLORS}
-              valueFormatter={valueFormatter}
-              showLegend
-              innerRadius={45}
-              outerRadius="90%"
-            />
-          )}
+      {status === "complete" && chart && chart.type === "scatter" && (
+        <div className="h-72">
+          <ScatterPlot chart={chart} />
         </div>
+      )}
+      {status === "complete" && chart && chart.type !== "scatter" && (
+        <CategoryChartView chart={chart} />
+      )}
+
+      {status === "complete" && chart?.notes && chart.notes.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-xs text-gray-500">
+          {chart.notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
       )}
 
       {status === "complete" && !payload && (

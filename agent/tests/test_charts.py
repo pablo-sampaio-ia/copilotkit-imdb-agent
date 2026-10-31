@@ -62,10 +62,19 @@ def test_aggregate_errors(movies):
 
 
 def test_histogram_counts_add_up(movies):
-    chart = charts.histogram_chart(movies, "rating", bins=4, filters=None, title=None)
+    chart = charts.histogram_chart(movies, "rating", bins=4, filters=None, title=None, trim_outliers=False)
     assert chart["type"] == "bar"
     assert len(chart["categories"]) == 4
     assert sum(chart["series"][0]["data"]) == 5  # 5 filmes têm nota
+
+
+def test_histogram_trims_extreme_values(movies):
+    movies.loc[0, "vote"] = 10_000_000  # um valor absurdo
+    trimmed = charts.histogram_chart(movies, "votes", bins=4, filters=None, title=None)
+    assert any("extreme values" in note for note in trimmed["notes"])
+    full = charts.histogram_chart(movies, "votes", bins=4, filters=None, title=None, trim_outliers=False)
+    assert sum(full["series"][0]["data"]) == 6
+    assert sum(trimmed["series"][0]["data"]) < 6
 
 
 def test_scatter_points_and_correlation_note(movies):

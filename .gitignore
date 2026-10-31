@@ -55,3 +55,4 @@ next-env.d.ts
 .cache/
 __pycache__/
 .pytest_cache/
+.npm-install.log

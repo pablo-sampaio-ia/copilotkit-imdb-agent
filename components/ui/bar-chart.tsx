@@ -45,6 +45,10 @@ export function BarChart({
   yAxisWidth = 55,
   layout = "horizontal",
 }: BarChartProps) {
+  // layout "horizontal" = barras em pé (categorias no eixo x);
+  // layout "vertical"   = barras deitadas (categorias no eixo y).
+  const lying = layout === "vertical";
+
   return (
     <ResponsiveContainer width="100%" height="100%" className={className}>
       <RechartsBarChart
@@ -55,30 +59,35 @@ export function BarChart({
         {showGrid && (
           <CartesianGrid
             strokeDasharray="3 3"
-            vertical={false}
+            vertical={lying}
+            horizontal={!lying}
             stroke="#e5e7eb"
           />
         )}
 
         {showXAxis && (
           <XAxis
-            dataKey={index}
+            dataKey={lying ? undefined : index}
             axisLine={false}
             tickLine={false}
             tick={{ fill: "#6b7280", fontSize: 12 }}
             dy={10}
-            type={layout === "horizontal" ? "category" : "number"}
+            type={lying ? "number" : "category"}
+            tickFormatter={lying ? valueFormatter : undefined}
+            interval={lying ? "preserveEnd" : 0}
           />
         )}
 
         {showYAxis && (
           <YAxis
-            tickFormatter={valueFormatter}
+            dataKey={lying ? index : undefined}
+            tickFormatter={lying ? undefined : valueFormatter}
             axisLine={false}
             tickLine={false}
             tick={{ fill: "#6b7280", fontSize: 12 }}
             width={yAxisWidth}
-            type={layout === "horizontal" ? "number" : "category"}
+            type={lying ? "category" : "number"}
+            interval={0}
           />
         )}
 
@@ -119,8 +128,8 @@ export function BarChart({
             fillOpacity={0.1}
             stroke={colors[i % colors.length]}
             strokeWidth={2}
-            radius={[4, 4, 0, 0]}
-            barSize={layout === "horizontal" ? 30 : 20}
+            radius={lying ? [0, 4, 4, 0] : [4, 4, 0, 0]}
+            barSize={lying ? 16 : 30}
             animationDuration={500}
           />
         ))}
