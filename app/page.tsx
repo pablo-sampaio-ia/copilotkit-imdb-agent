@@ -79,6 +79,7 @@ function HomeContent() {
         <Footer />
         <CopilotSidebar
           defaultOpen
+          width={480}
           messageView={{ assistantMessage: CustomAssistantMessage }}
           labels={{
             modalHeaderTitle: "IMDB Movies Assistant",
