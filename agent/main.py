@@ -1,70 +1,37 @@
-"""FastAPI + LangGraph agent for the IMDB movies-analysis project.
+"""Servidor do agente: FastAPI + LangGraph exposto por AG-UI na porta 8123.
 
-Serves a LangGraph agent over AG-UI on port 8123, for the Next.js CopilotKit
-runtime at ``app/api/copilotkit/[[...slug]]/route.ts`` to connect to via
-``HttpAgent``. The agent answers questions about the IMDB top-movies-per-year
-dataset by calling pandas-backed tools in ``tools.py``: two fixed,
-parameterized tools (`plot_chart`, `analyze_data`) for charts and summaries,
-plus a restricted `run_python_analysis` sandbox for ad-hoc analysis beyond
-what those two cover.
+O runtime do Next.js (app/api/copilotkit/[[...slug]]/route.ts) conecta aqui
+com um `HttpAgent`. A lógica de dados está no pacote `imdb/`:
+
+    imdb/data.py            carga do CSV, colunas e apelidos
+    imdb/filters.py         filtros em JSON
+    imdb/charts.py          especificações de gráfico
+    imdb/summary.py         resumos em texto
+    imdb/python_sandbox.py  trechos de Python (e figuras)
+    imdb/tools.py           as ferramentas que o agente enxerga
+    imdb/prompt.py          o system prompt
 """
-
-import os
 
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from copilotkit import CopilotKitMiddleware, CopilotKitState, LangGraphAGUIAgent
-from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
 import uvicorn
 
-from tools import analyze_data, list_columns, plot_chart, run_python_analysis
+from imdb.config import MODEL, check_environment
+from imdb.images import image_path
+from imdb.prompt import SYSTEM_PROMPT
+from imdb.tools import ALL_TOOLS
 
-load_dotenv()
+check_environment()
 
-MODEL = os.getenv("COPILOTKIT_AGENT_MODEL", "openai:gpt-5.6-luna")
-
-SYSTEM_PROMPT = """
-You are the IMDB Movies assistant. You help users explore a dataset of the \
-top-rated movies per year worldwide, with fields like title, year, rating, \
-vote count, budget, box-office gross, director, cast, genre, country, and \
-awards (wins/nominations/Oscars).
-
-You have these tools:
-- list_columns: look up the available fields and their friendly aliases
-  (e.g. "rating", "votes", "revenue", "country").
-- plot_chart: compute an aggregation with pandas and return structured chart
-  JSON (bar, line, or pie). This is the ONLY way you show a chart -- never
-  describe a chart in prose instead of calling this tool, and never claim to
-  have produced an image.
-- analyze_data: compute a short statistical summary (count/total/mean/min/max)
-  grouped by a field, for a written analysis.
-- run_python_analysis: run a short Python snippet against the full dataframe
-  (available as `df`) for analysis plot_chart/analyze_data don't cover --
-  correlations, custom multi-column groupings, inspecting messy fields like
-  "genre", top-N by more than one criterion, etc. It is sandboxed (no file,
-  network, or import access) and times out after 10 seconds. It returns text,
-  never a chart -- use plot_chart for anything the user should see rendered.
-- confirm_chart_spec (frontend tool): shows the user your proposed chart type,
-  fields, and filters and lets them approve or edit it before you call
-  plot_chart.
-
-Quality gate -- call confirm_chart_spec BEFORE calling plot_chart whenever the
-request is broad or ambiguous: no specific column(s) named, no filters at
-all, or a request spanning the whole dataset / "everything" / "all movies".
-Skip the confirmation only when the user's request already names specific
-fields, filters, or a narrow scope (e.g. one genre, one decade).
-
-Always ground your answers in tool results. If a tool call returns an error
-or empty result, tell the user what was missing instead of guessing. Keep
-prose replies brief and use Markdown tables for any numeric summaries you
-write by hand.
-"""
-
+# `create_agent` monta um grafo ReAct (modelo <-> ferramentas). O
+# CopilotKitMiddleware injeta as ferramentas e o contexto vindos do front-end.
 graph = create_agent(
     model=MODEL,
-    tools=[list_columns, plot_chart, analyze_data, run_python_analysis],
+    tools=ALL_TOOLS,
     middleware=[CopilotKitMiddleware()],
     system_prompt=SYSTEM_PROMPT,
     state_schema=CopilotKitState,
@@ -73,6 +40,7 @@ graph = create_agent(
 
 app = FastAPI()
 
+# Endpoint AG-UI (POST /): recebe mensagens e devolve o stream de eventos.
 add_langgraph_fastapi_endpoint(
     app=app,
     agent=LangGraphAGUIAgent(
@@ -87,14 +55,18 @@ add_langgraph_fastapi_endpoint(
 )
 
 
+@app.get("/images/{image_id}")
+def get_image(image_id: str) -> FileResponse:
+    """Serve as figuras geradas por run_python_analysis (ver imdb/images.py)."""
+    path = image_path(image_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(path, media_type="image/png")
+
+
 def main():
-    """Run the uvicorn server."""
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8123,
-        reload=True,
-    )
+    """Sobe o uvicorn."""
+    uvicorn.run("main:app", host="0.0.0.0", port=8123, reload=True)
 
 
 if __name__ == "__main__":

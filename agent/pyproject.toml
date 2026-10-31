@@ -1,7 +1,7 @@
 [project]
 name = "imdb-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Agente LangGraph (AG-UI) para analisar o dataset IMDB top movies per year"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -10,8 +10,16 @@ dependencies = [
     "fastapi>=0.162.0",
     "langchain>=1",
     "langchain-openai>=1.7.3",
+    "matplotlib>=3.9",
     "pandas>=3.1.0",
     "pyarrow>=26.0.0",
     "python-dotenv>=1.2.4",
     "uvicorn>=0.54.0",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
