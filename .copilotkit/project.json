@@ -1,0 +1,8 @@
+{
+  "projectId": "16999",
+  "projectSlug": "imdb-movies-agent",
+  "clerkOrgId": "org_3LTDWVOpuqiWQiMMJuH1bPounN4",
+  "telemetryBindingId": "78ee2a87-c8ca-4a5e-9e13-0a1bc3168e58",
+  "runtimeUrl": "http://localhost:3000/api/copilotkit",
+  "apiKeyDirectory": "."
+}

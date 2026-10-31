@@ -1,0 +1,17 @@
+[project]
+name = "imdb-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "ag-ui-langgraph>=0.0.47",
+    "copilotkit>=0.1.96",
+    "fastapi>=0.162.0",
+    "langchain>=1",
+    "langchain-openai>=1.7.3",
+    "pandas>=3.1.0",
+    "pyarrow>=26.0.0",
+    "python-dotenv>=1.2.4",
+    "uvicorn>=0.54.0",
+]

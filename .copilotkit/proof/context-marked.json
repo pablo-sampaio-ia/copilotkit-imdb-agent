@@ -1,0 +1,59 @@
+{
+  "messages": [
+    {
+      "id": "msg-context-marked",
+      "role": "user",
+      "content": "Show me a bar chart of total worldwide gross by genre for the top 5 genres\n\nIn your reply, quote the text of \"Current time\", word for word."
+    }
+  ],
+  "context": [
+    {
+      "description": "Current time",
+      "value": "10:30:00 PM [probe-675696f8]"
+    }
+  ],
+  "tools": [
+    {
+      "name": "confirm_chart_spec",
+      "description": "Ask the user to confirm (or reject) a proposed chart specification before running it, when the request is broad or ambiguous (no specific fields/filters, or spans the whole dataset).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why confirmation is needed, shown to the user."
+          },
+          "chart_type": {
+            "type": "string",
+            "enum": [
+              "bar",
+              "line",
+              "pie"
+            ]
+          },
+          "x_field": {
+            "type": "string"
+          },
+          "y_field": {
+            "type": "string"
+          },
+          "group_by": {
+            "type": "string"
+          },
+          "agg": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      }
+    }
+  ]
+}
